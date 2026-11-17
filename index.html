@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Instrument feedback</title>
+<style>
+  :root {
+    --ink: #1c2430; --muted: #5d6877; --line: #d5dae1; --bg: #f4f1ec; --card: #ffffff;
+    --accent: #7a3b1d; --accent-ink: #ffffff; --ok: #1f6b3a; --bad: #a12222; --warn-bg: #fff4d6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px 16px 56px; }
+  h1 { font-size: 1.45rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; margin: 0 0 14px; }
+  label { display: block; font-weight: 600; margin: 0 0 6px; }
+  .hint { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
+  input[type=text], input[type=date], input[type=search], select, textarea {
+    width: 100%; padding: 11px 12px; font: inherit; color: inherit; background: #fff;
+    border: 1px solid #aab2bd; border-radius: 8px; }
+  textarea { min-height: 110px; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible,
+  .score input:focus-visible + span { outline: 3px solid #2b6cb0; outline-offset: 1px; }
+  .field { margin: 0 0 14px; }
+  .field:last-child { margin-bottom: 0; }
+  button { font: inherit; cursor: pointer; }
+  .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px;
+    padding: 13px 18px; font-weight: 700; width: 100%; }
+  .btn[disabled] { opacity: 0.55; cursor: default; }
+  .link { background: none; border: 0; color: var(--accent); padding: 4px 0; text-decoration: underline; }
+  .banner { border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; }
+  .banner.warn { background: var(--warn-bg); border: 1px solid #e0c36a; }
+  .banner.bad { background: #fde8e8; border: 1px solid #e3a1a1; color: var(--bad); }
+  .banner.ok { background: #e4f4e9; border: 1px solid #9fcfb0; color: var(--ok); }
+  .banner ul { margin: 6px 0 0; padding-left: 20px; }
+  #results { list-style: none; margin: 8px 0 0; padding: 0; max-height: 300px; overflow: auto; }
+  #results button { display: block; width: 100%; text-align: left; background: #fff;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 0 0 6px; }
+  #results button:hover { border-color: var(--accent); }
+  #results strong { display: inline-block; min-width: 76px; }
+  .picked { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .picked .serial { font-size: 1.3rem; font-weight: 700; }
+  dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 3px 14px; margin: 10px 0 0; }
+  dl.meta dt { color: var(--muted); }
+  dl.meta dd { margin: 0; overflow-wrap: anywhere; }
+  details { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .part { margin: 10px 0 0; padding: 10px 12px; background: #faf8f5; border: 1px solid var(--line); border-radius: 8px; }
+  .part h3 { font-size: 1rem; margin: 0 0 6px; }
+  .part dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; margin: 0; font-size: 0.95rem; }
+  .part dt { color: var(--muted); }
+  .part dd { margin: 0; overflow-wrap: anywhere; }
+  .past { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 0.95rem; }
+  .past .who { color: var(--muted); }
+  fieldset { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+  legend { font-weight: 600; padding: 0; margin: 0 0 6px; }
+  .score { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .score label { margin: 0; font-weight: 600; }
+  .score input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .score span { display: block; text-align: center; padding: 12px 0; border: 1px solid #aab2bd;
+    border-radius: 8px; background: #fff; cursor: pointer; }
+  .score input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .dictate { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .mic { background: #fff; color: var(--accent); border: 2px solid var(--accent); border-radius: 8px;
+    padding: 11px 16px; font-weight: 700; min-width: 170px; }
+  .mic.on { background: var(--bad); border-color: var(--bad); color: #fff; }
+  textarea.listening { border-color: var(--bad); box-shadow: 0 0 0 2px #f3c4c4; }
+  .check { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+  .check input { width: 22px; height: 22px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 520px) { .two { grid-template-columns: 1fr; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Instrument feedback</h1>
+  <p class="lead">Record how a finished instrument plays, looks and sells. It takes about a minute.</p>
+
+  <div id="loading" class="banner warn" role="status">Loading the instrument list…</div>
+  <div id="notice" class="banner warn" hidden></div>
+  <div id="fatal" class="banner bad" role="alert" hidden></div>
+
+  <form id="codeBox" hidden novalidate>
+    <section>
+      <div class="field">
+        <label for="codeInput">Team access code <span class="hint">ask Luke if you do not have it</span></label>
+        <input type="text" id="codeInput" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="40">
+      </div>
+      <div id="codeError" class="banner bad" role="alert" hidden>That code was not accepted. Check it and try again.</div>
+      <button type="submit" class="btn">Continue</button>
+    </section>
+  </form>
+
+  <div id="done" hidden>
+    <div class="banner ok" role="status" id="doneText"></div>
+    <button type="button" class="btn" id="another">Enter feedback for another instrument</button>
+  </div>
+
+  <form id="form" novalidate hidden>
+    <section>
+      <div class="field">
+        <label for="by">Your name</label>
+        <input type="text" id="by" list="staff" maxlength="60" autocomplete="name">
+        <datalist id="staff"></datalist>
+      </div>
+    </section>
+
+    <section>
+      <h2>Instrument</h2>
+      <div id="picker">
+        <label for="search">Find by serial number, model or maker</label>
+        <input type="search" id="search" placeholder="For example A2794" autocomplete="off">
+        <ul id="results"></ul>
+      </div>
+      <div id="chosen" hidden>
+        <div class="picked">
+          <span class="serial" id="chosenSerial"></span>
+          <button type="button" class="link" id="change">Choose a different instrument</button>
+        </div>
+        <div id="detailLoading" class="hint">Loading details…</div>
+        <dl class="meta" id="meta"></dl>
+        <details id="woodBox" hidden>
+          <summary>Wood and workshop details</summary>
+          <div id="wood"></div>
+        </details>
+        <details id="pastBox" hidden>
+          <summary id="pastSummary"></summary>
+          <div id="past"></div>
+        </details>
+      </div>
+    </section>
+
+    <section>
+      <h2>Scores <span class="hint">1 is poor, 5 is excellent</span></h2>
+      <div id="scores"></div>
+      <div class="field">
+        <label for="comments">Comments <span class="hint">what you or the customer noticed</span></label>
+        <textarea id="comments" maxlength="2000"></textarea>
+        <div class="dictate">
+          <button type="button" class="mic" id="dictate" hidden aria-pressed="false">Tap to dictate</button>
+          <span class="hint" id="dictateStatus" role="status"></span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Sale details <span class="hint">optional, fill in what you know</span></h2>
+      <div class="two">
+        <div class="field">
+          <label for="saleDate">Sale date</label>
+          <input type="date" id="saleDate">
+        </div>
+        <div class="field">
+          <label for="customerType">Customer type</label>
+          <select id="customerType"><option value="">Not recorded</option></select>
+        </div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="isReturn"> Returned, or the customer complained</label>
+      </div>
+      <div class="field" id="returnBox" hidden>
+        <label for="returnNote">What happened?</label>
+        <textarea id="returnNote" maxlength="1000" style="min-height:80px"></textarea>
+      </div>
+    </section>
+
+    <div id="errors" class="banner bad" role="alert" hidden></div>
+    <button type="submit" class="btn" id="save">Save feedback</button>
+  </form>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  // On the real page Google provides google.script.run. When the page is
+  // opened from the test server on a PC, the same calls go to /api instead.
+  // Where the page sends its requests when it is hosted outside Google.
+  var API_URL = 'https://script.google.com/macros/s/AKfycbwSnY3OxLltfP9pmRGDbBQmKZeCXESc082PLdcqRCZ1zIYKns9ED6UlWa42S-umACgguQ/exec';
+  var LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      return new Promise(function (resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fn].apply(runner, args);
+      });
+    }
+    return remote(fn, args);
+  }
+
+  // text/plain keeps the browser from sending a pre-check that Google rejects.
+  function remote(fn, args) {
+    return fetch(LOCAL ? '/exec' : API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn: fn, args: args, code: remember('feedbackCode') })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('the server answered ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (j.error === 'CODE') {
+        return askCode().then(function () { return remote(fn, args); });
+      }
+      if (j.error) throw new Error(j.error);
+      return j.result;
+    });
+  }
+
+  // Shows the access-code box and waits until a code has been entered.
+  var codeWaiters = null;
+  function askCode() {
+    if (!codeWaiters) {
+      codeWaiters = [];
+      var tried = remember('feedbackCode');
+      $('codeError').hidden = !tried;
+      $('codeInput').value = '';
+      $('codeBox').hidden = false;
+      $('loading').hidden = true;
+      $('codeInput').focus();
+    }
+    return new Promise(function (resolve) { codeWaiters.push(resolve); });
+  }
+  function codeEntered(ev) {
+    ev.preventDefault();
+    var code = $('codeInput').value.trim();
+    if (!code || !codeWaiters) return;
+    remember('feedbackCode', code);
+    sessionCode = code;
+    $('codeBox').hidden = true;
+    var waiting = codeWaiters;
+    codeWaiters = null;
+    waiting.forEach(function (resolve) { resolve(); });
+  }
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, text, cls) {
+    var e = document.createElement(tag);
+    if (text !== undefined && text !== null) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+  function newId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var s = '';
+    for (var i = 0; i < 24; i++) s += Math.floor(Math.random() * 36).toString(36);
+    return 'e-' + Date.now().toString(36) + '-' + s;
+  }
+  var sessionCode = '';
+  function remember(key, value) {
+    try {
+      if (value === undefined) return localStorage.getItem(key) || (key === 'feedbackCode' ? sessionCode : '');
+      localStorage.setItem(key, value);
+    } catch (e) {
+      // Private browsing: nothing is kept between visits.
+      if (value === undefined && key === 'feedbackCode') return sessionCode;
+    }
+    return '';
+  }
+
+  var SCORES = [
+    { key: 'tone', label: 'Tone' },
+    { key: 'playability', label: 'Playability' },
+    { key: 'appearance', label: 'Appearance' },
+    { key: 'overall', label: 'Overall' }
+  ];
+  var instruments = [];
+  var selected = '';
+  var entryId = newId();
+  var saving = false;
+
+  function buildScores() {
+    var box = $('scores');
+    SCORES.forEach(function (s) {
+      var fs = el('fieldset');
+      fs.appendChild(el('legend', s.label));
+      var row = el('div', null, 'score');
+      for (var n = 1; n <= 5; n++) {
+        var lab = el('label');
+        var inp = el('input');
+        inp.type = 'radio'; inp.name = s.key; inp.value = String(n);
+        inp.setAttribute('aria-label', s.label + ' ' + n + ' out of 5');
+        lab.appendChild(inp);
+        lab.appendChild(el('span', String(n)));
+        row.appendChild(lab);
+      }
+      fs.appendChild(row);
+      box.appendChild(fs);
+    });
+  }
+
+  function showResults() {
+    var q = $('search').value.trim().toLowerCase();
+    var list = $('results');
+    list.textContent = '';
+    var hits = instruments.filter(function (i) {
+      return !q || (i.serial + ' ' + i.model + ' ' + i.maker).toLowerCase().indexOf(q) >= 0;
+    });
+    if (!hits.length) {
+      list.appendChild(el('li', 'No instrument matches "' + $('search').value.trim() +
+        '". Check the serial number, or ask the workshop whether its sheet has been made yet.', 'hint'));
+      return;
+    }
+    hits.slice(0, 40).forEach(function (i) {
+      var li = el('li');
+      var b = el('button');
+      b.type = 'button';
+      b.appendChild(el('strong', i.serial));
+      b.appendChild(document.createTextNode(' ' + [i.model, i.maker].filter(Boolean).join(' · ')));
+      b.addEventListener('click', function () { choose(i.serial); });
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    if (hits.length > 40) list.appendChild(el('li', 'Showing the first 40. Type more to narrow the list.', 'hint'));
+  }
+
+  function pairs(dl, items) {
+    dl.textContent = '';
+    items.forEach(function (m) {
+      if (!m.value) return;
+      dl.appendChild(el('dt', m.label));
+      dl.appendChild(el('dd', m.value));
+    });
+  }
+
+  function choose(serial) {
+    selected = serial;
+    $('picker').hidden = true;
+    $('chosen').hidden = false;
+    $('chosenSerial').textContent = serial;
+    $('detailLoading').hidden = false;
+    $('detailLoading').textContent = 'Loading details…';
+    $('meta').textContent = '';
+    $('woodBox').hidden = true;
+    $('pastBox').hidden = true;
+    call('getInstrument', serial).then(function (d) {
+      if (selected !== serial) return;
+      $('detailLoading').hidden = true;
+      pairs($('meta'), d.meta);
+      var wood = $('wood');
+      wood.textContent = '';
+      d.parts.forEach(function (p) {
+        if (!p.fields.length) return;
+        var card = el('div', null, 'part');
+        card.appendChild(el('h3', p.part));
+        var dl = el('dl');
+        pairs(dl, p.fields);
+        card.appendChild(dl);
+        wood.appendChild(card);
+      });
+      $('woodBox').hidden = !wood.children.length;
+      var past = $('past');
+      past.textContent = '';
+      d.feedback.forEach(function (f) {
+        var card = el('div', null, 'past');
+        card.appendChild(el('div', f.when + ' · ' + f.by, 'who'));
+        card.appendChild(el('div', 'Tone ' + f.tone + ', playability ' + f.playability +
+          ', appearance ' + f.appearance + ', overall ' + f.overall));
+        if (f.comments) card.appendChild(el('div', f.comments));
+        var sale = [f.saleDate ? 'Sold ' + f.saleDate : '', f.customerType].filter(Boolean).join(' · ');
+        if (sale) card.appendChild(el('div', sale, 'who'));
+        if (f.isReturn) card.appendChild(el('div', 'Return or complaint: ' + f.returnNote));
+        past.appendChild(card);
+      });
+      $('pastBox').hidden = !d.feedback.length;
+      $('pastSummary').textContent = 'Earlier feedback for this instrument (' + d.feedback.length + ')';
+    }).catch(function (err) {
+      if (selected !== serial) return;
+      $('detailLoading').textContent = 'The details could not be loaded (' + (err && err.message ? err.message : err) +
+        '). You can still save feedback for ' + serial + '.';
+    });
+  }
+
+  function unchoose() {
+    selected = '';
+    $('chosen').hidden = true;
+    $('picker').hidden = false;
+    $('search').focus();
+    showResults();
+  }
+
+  function showErrors(list) {
+    var box = $('errors');
+    box.textContent = '';
+    if (!list.length) { box.hidden = true; return; }
+    box.appendChild(el('strong', 'Not saved yet. Please fix:'));
+    var ul = el('ul');
+    list.forEach(function (m) { ul.appendChild(el('li', m)); });
+    box.appendChild(ul);
+    box.hidden = false;
+    box.scrollIntoView({ block: 'nearest' });
+  }
+
+  function collect() {
+    var p = {
+      id: entryId, serial: selected, by: $('by').value.trim(),
+      comments: $('comments').value.trim(), saleDate: $('saleDate').value,
+      customerType: $('customerType').value, isReturn: $('isReturn').checked,
+      returnNote: $('returnNote').value.trim()
+    };
+    SCORES.forEach(function (s) {
+      var c = document.querySelector('input[name="' + s.key + '"]:checked');
+      p[s.key] = c ? Number(c.value) : '';
+    });
+    return p;
+  }
+
+  function localProblems(p) {
+    var out = [];
+    if (!p.by) out.push('Enter your name.');
+    if (!p.serial) out.push('Choose an instrument.');
+    SCORES.forEach(function (s) { if (p[s.key] === '') out.push(s.label + ': choose a score from 1 to 5.'); });
+    if (p.isReturn && !p.returnNote) out.push('Add a short note about the return or complaint.');
+    return out;
+  }
+
+  // ---------- dictation (uses the browser's own speech recognition) ----------
+  var Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recog = null;
+  var listening = false;
+  var dictBase = '';
+  var dictFinal = '';
+
+  function dictStatus(text) { $('dictateStatus').textContent = text; }
+
+  function dictRender(interim) {
+    var spoken = (dictFinal + ' ' + (interim || '')).replace(/\s+/g, ' ').trim();
+    var joined = dictBase && spoken ? dictBase + ' ' + spoken : dictBase + spoken;
+    var box = $('comments');
+    box.value = joined.slice(0, 2000);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function dictStopped(message) {
+    listening = false;
+    recog = null;
+    $('dictate').classList.remove('on');
+    $('dictate').setAttribute('aria-pressed', 'false');
+    $('dictate').textContent = 'Tap to dictate';
+    $('comments').classList.remove('listening');
+    dictRender('');
+    dictStatus(message || ($('comments').value ? 'Check the text, then save.' : ''));
+  }
+
+  function stopDictation() {
+    if (recog) { try { recog.stop(); } catch (e) { dictStopped(); } }
+  }
+
+  function startDictation() {
+    var r;
+    try {
+      r = new Recognition();
+    } catch (e) {
+      dictStopped('Dictation is not available here. Use the mic key on your keyboard instead.');
+      return;
+    }
+    r.lang = navigator.language || 'en-US';
+    r.continuous = true;
+    r.interimResults = true;
+    dictBase = $('comments').value.trim();
+    dictFinal = '';
+    var failure = '';
+    r.onresult = function (ev) {
+      var interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var text = ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) dictFinal += ' ' + text; else interim += text;
+      }
+      dictRender(interim);
+    };
+    r.onerror = function (ev) {
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        // The page is not allowed to use the microphone, so stop offering the button.
+        $('dictate').hidden = true;
+        failure = KEYBOARD_TIP;
+      } else if (ev.error === 'no-speech') {
+        failure = 'Nothing was heard. Tap to dictate and try again.';
+      } else if (ev.error === 'audio-capture') {
+        failure = 'No microphone was found on this device.';
+      } else if (ev.error === 'network') {
+        failure = 'Dictation needs an internet connection. Try again, or type the comment.';
+      } else if (ev.error !== 'aborted') {
+        failure = 'Dictation stopped (' + ev.error + '). Tap to try again, or type the comment.';
+      }
+    };
+    r.onend = function () { if (recog === r) dictStopped(failure); };
+    try {
+      r.start();
+    } catch (e) {
+      dictStopped('Dictation could not start. Use the mic key on your keyboard instead.');
+      return;
+    }
+    recog = r;
+    listening = true;
+    $('dictate').classList.add('on');
+    $('dictate').setAttribute('aria-pressed', 'true');
+    $('dictate').textContent = 'Stop dictating';
+    $('comments').classList.add('listening');
+    dictStatus('Listening… speak now. Tap Stop when you are done.');
+  }
+
+  var KEYBOARD_TIP = 'To dictate, tap in the box, then tap the microphone key on your keyboard.';
+
+  // Google's form frame does not pass the microphone through to the page, so the
+  // button only appears where the browser says the microphone is available.
+  function micAllowed() {
+    try {
+      var policy = document.permissionsPolicy || document.featurePolicy;
+      if (policy && policy.allowsFeature) return policy.allowsFeature('microphone');
+    } catch (e) { /* fall through and let the button try */ }
+    return true;
+  }
+
+  function setupDictation() {
+    if (!Recognition || !micAllowed()) {
+      dictStatus(KEYBOARD_TIP);
+      return;
+    }
+    $('dictate').hidden = false;
+    $('dictate').addEventListener('click', function () {
+      if (listening) stopDictation(); else startDictation();
+    });
+    // Typing by hand takes over from dictation.
+    $('comments').addEventListener('input', function () {
+      if (!listening) return;
+      dictBase = $('comments').value;
+      dictFinal = '';
+      stopDictation();
+    });
+  }
+
+  function setSaving(on) {
+    saving = on;
+    $('save').disabled = on;
+    $('save').textContent = on ? 'Saving…' : 'Save feedback';
+  }
+
+  function submit(ev) {
+    ev.preventDefault();
+    if (saving) return;
+    if (listening) {
+      var active = recog;
+      dictStopped();
+      try { active.abort(); } catch (e) { /* already stopped */ }
+    }
+    var p = collect();
+    var problems = localProblems(p);
+    showErrors(problems);
+    if (problems.length) return;
+    setSaving(true);
+    call('submitFeedback', p).then(function (res) {
+      setSaving(false);
+      if (!res || !res.ok) {
+        showErrors(res && res.errors ? res.errors : ['The feedback was not saved. Try again.']);
+        return;
+      }
+      remember('feedbackName', p.by);
+      $('form').hidden = true;
+      $('doneText').textContent = 'Saved. Feedback for ' + res.serial + ' is in the log.';
+      $('done').hidden = false;
+      window.scrollTo(0, 0);
+    }).catch(function (err) {
+      setSaving(false);
+      showErrors(['The feedback could not be saved (' + (err && err.message ? err.message : 'no connection') +
+        '). Check your connection and press Save again. Nothing you typed has been lost.']);
+    });
+  }
+
+  function reset() {
+    entryId = newId();
+    $('form').reset();
+    dictBase = '';
+    dictFinal = '';
+    if (Recognition) dictStatus('');
+    $('by').value = remember('feedbackName');
+    $('returnBox').hidden = true;
+    showErrors([]);
+    $('done').hidden = true;
+    $('form').hidden = false;
+    unchoose();
+    $('search').value = '';
+    showResults();
+  }
+
+  buildScores();
+  setupDictation();
+  $('search').addEventListener('input', showResults);
+  $('change').addEventListener('click', unchoose);
+  $('isReturn').addEventListener('change', function () { $('returnBox').hidden = !this.checked; });
+  $('form').addEventListener('submit', submit);
+  $('another').addEventListener('click', reset);
+  $('codeBox').addEventListener('submit', codeEntered);
+
+  call('getFormData').then(function (d) {
+    instruments = d.instruments || [];
+    $('loading').hidden = true;
+    if (d.notice) { $('notice').textContent = d.notice; $('notice').hidden = false; }
+    if (!instruments.length) {
+      $('fatal').textContent = 'The instrument list is empty. Ask Luke to check the Settings tab of the Sales feedback workbook.';
+      $('fatal').hidden = false;
+      return;
+    }
+    (d.staff || []).forEach(function (n) {
+      var o = el('option'); o.value = n; $('staff').appendChild(o);
+    });
+    (d.customerTypes || []).forEach(function (t) {
+      var o = el('option', t); o.value = t; $('customerType').appendChild(o);
+    });
+    $('by').value = remember('feedbackName');
+    $('form').hidden = false;
+    showResults();
+  }).catch(function (err) {
+    $('loading').hidden = true;
+    $('fatal').textContent = 'The form could not load (' + (err && err.message ? err.message : 'no connection') +
+      '). Check your connection and refresh the page.';
+    $('fatal').hidden = false;
+  });
+})();
+</script>
+</body>
+</html>
